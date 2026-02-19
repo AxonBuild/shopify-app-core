@@ -10,8 +10,11 @@ from app.database.models import ShopInstallation  # noqa: F401
 from app.database.repositories.shop_installation_repository import ShopInstallationRepository
 from app.middleware.request_logging import log_requests_middleware
 from app.routes.auth_routes import router as auth_router
+from app.routes.data_routes import router as data_router
 from app.services.shopify_auth_service import shopify_auth_service
 from app.utils.logger import get_logger
+from app.utils.security import verify_shopify_hmac
+
 from sqlalchemy.orm import Session
 
 
@@ -92,6 +95,12 @@ def create_app() -> FastAPI:
         # request to the App URL with shop + hmac + timestamp. We detect this
         # by the presence of hmac and the absence of embedded=1.
         if shop and hmac and embedded != "1":
+            # OPTIONAL BUT RECOMMENDED: Validate HMAC before redirecting.
+            # This ensures only legitimate requests from Shopify trigger the auth flow.
+            if not verify_shopify_hmac(params, settings.shopify_api_secret):
+                logger.warning("root — HMAC validation failed for initial install request: shop=%s", shop)
+                return Response("Unauthorized: Invalid HMAC signature", status_code=401)
+
             logger.info("root — install trigger detected for shop=%s, redirecting to OAuth", shop)
             return RedirectResponse(
                 url=f"/auth/install?shop={shop}",
@@ -157,6 +166,13 @@ def create_app() -> FastAPI:
                     <p>Backend is running successfully.</p>
                     {shop_line}
                     <div class="badge">&#9989; Frontend coming soon</div>
+                    
+                    <div style="margin-top: 1.5rem; pt-4; border-top: 1px solid #eee;">
+                        <a href="/dashboard?shop={shop}" 
+                           style="display: inline-block; text-decoration: none; color: white; background: #008060; padding: 10px 20px; border-radius: 6px; font-weight: 500;">
+                           View Data Dashboard &rarr;
+                        </a>
+                    </div>
                 </div>
 
                 <script>
@@ -184,6 +200,10 @@ def create_app() -> FastAPI:
 
     app.include_router(auth_router, prefix="/auth", tags=["auth"])
     logger.info("Auth router mounted at /auth.")
+
+    app.include_router(data_router, tags=["data"])
+    logger.info("Data router mounted.")
+
     return app
 
 
