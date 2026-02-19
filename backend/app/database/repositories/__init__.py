@@ -1,0 +1,2 @@
+from app.database.repositories.shop_installation_repository import ShopInstallationRepository
+

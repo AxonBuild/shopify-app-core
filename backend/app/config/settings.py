@@ -1,0 +1,25 @@
+from pydantic_settings import BaseSettings, SettingsConfigDict
+
+
+class Settings(BaseSettings):
+    shopify_api_key: str
+    shopify_api_secret: str
+    app_base_url: str
+    shopify_scopes: str = "read_products,read_orders"
+    shopify_api_version: str = "2025-01"
+    sqlite_url: str = "sqlite:///./shopify_auth.db"
+    state_ttl_seconds: int = 600
+    log_level: str = "INFO"
+    request_log_body_limit: int = 4000
+    # Where to send the merchant after a successful OAuth install.
+    # Swap this for your real frontend URL when it's ready.
+    post_install_redirect_url: str = "https://bilalportfolio-hazel.vercel.app/"
+
+    model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8")
+
+    @property
+    def redirect_uri(self) -> str:
+        return f"{self.app_base_url.rstrip('/')}/auth/callback"
+
+
+settings = Settings()

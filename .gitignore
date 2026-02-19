@@ -1,0 +1,12 @@
+__pycache__/
+*.py[cod]
+*$py.class
+venv/
+.env
+.idea/
+.vscode/
+shopify_auth.db
+*.log
+dist/
+build/
+*.egg-info/
