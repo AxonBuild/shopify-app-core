@@ -110,15 +110,14 @@ class SearchService:
         self,
         query: str,
         text_vector: Optional[List[float]] = None,
-        image_vector: Optional[List[float]] = None,
         limit: int = 10,
         semantic_ratio: float = None,
         filter_str: Optional[str] = None,
         ranking_score_threshold: Optional[float] = None,
     ) -> List[Dict[str, Any]]:
         """
-        Runs dual hybrid search (text embedder vs image embedder) in parallel and merges results.
-        ranking_score_threshold: if set, Meilisearch only returns hits with _rankingScore >= threshold.
+        Runs text-embedding hybrid search in Meilisearch.
+        ranking_score_threshold: if set, only returns hits with _rankingScore >= threshold.
         """
         if semantic_ratio is None:
             semantic_ratio = settings.search_semantic_ratio
@@ -127,10 +126,18 @@ class SearchService:
         if not index:
             return []
 
-        def _search_text():
-            if not text_vector:
-                return []
-            params = {
+        if not text_vector:
+            try:
+                fallback_params: dict = {"limit": limit, "showRankingScore": True}
+                if filter_str:
+                    fallback_params["filter"] = filter_str
+                res = index.search(query, fallback_params)
+                text_hits = res.get("hits", [])
+            except Exception as e:
+                logger.error(f"Keyword search failed: {e}")
+                text_hits = []
+        else:
+            params: dict = {
                 "hybrid": {"embedder": "text", "semanticRatio": semantic_ratio},
                 "vector": text_vector,
                 "limit": limit,
@@ -142,86 +149,27 @@ class SearchService:
                 params["rankingScoreThreshold"] = ranking_score_threshold
             try:
                 res = index.search(query, params)
-                return res.get("hits", [])
+                text_hits = res.get("hits", [])
             except Exception as e:
                 logger.error(f"Text embedder search failed: {e}")
-                return []
+                text_hits = []
 
-        def _search_image():
-            if not image_vector:
-                return []
-            params = {
-                "hybrid": {"embedder": "image", "semanticRatio": semantic_ratio},
-                "vector": image_vector,
-                "limit": limit,
-                "showRankingScore": True,
-            }
-            if filter_str:
-                params["filter"] = filter_str
-            if ranking_score_threshold is not None:
-                params["rankingScoreThreshold"] = ranking_score_threshold
-            try:
-                res = index.search(query, params)
-                return res.get("hits", [])
-            except Exception as e:
-                logger.error(f"Image embedder search failed: {e}")
-                return []
-
-        # ── Run both Meilisearch queries in parallel ────────────────────────────
-        text_hits = []
-        image_hits = []
-
-        with ThreadPoolExecutor(max_workers=2) as pool:
-            future_text  = pool.submit(_search_text)
-            future_image = pool.submit(_search_image)
-            text_hits  = future_text.result()
-            image_hits = future_image.result()
-
-        # ── Merge & Score ───────────────────────────────────────────────────────
-        # Primary sort  : _score      — 2 if hit by both embedders, 1 if only one
-        # Secondary sort: _rankingScore — Meilisearch's own similarity score (0–1)
-        #                 We keep the BEST score across embedders for each product.
-        seen: Dict[str, Dict] = {}
-
+        # Tag each hit with source metadata (kept for UI badge compatibility)
         for hit in text_hits:
-            pid = hit["id"]
-            hit["_sources"] = ["text"]
-            hit["_score"]   = 1
-            hit["_rankingScore"] = hit.get("_rankingScore", 0.0)
-            seen[pid] = hit
+            hit.setdefault("_sources",      ["text"])
+            hit.setdefault("_score",        1)
+            hit.setdefault("_rankingScore", 0.0)
 
-        for hit in image_hits:
-            pid = hit["id"]
-            img_rs = hit.get("_rankingScore", 0.0)
-            if pid in seen:
-                seen[pid]["_score"] = 2
-                seen[pid]["_sources"].append("image")
-                # Keep the higher ranking score across both embedders
-                seen[pid]["_rankingScore"] = max(seen[pid]["_rankingScore"], img_rs)
-            else:
-                hit["_sources"]      = ["image"]
-                hit["_score"]        = 1
-                hit["_rankingScore"] = img_rs
-                seen[pid] = hit
-
-        merged_hits = sorted(
-            seen.values(),
-            key=lambda h: (h["_score"], h["_rankingScore"]),
-            reverse=True,
-        )
-
-        if merged_hits:
+        if text_hits:
             logger.info("━" * 60)
-            logger.info(f"📊 HYBRID SEARCH RESULTS (Total unique: {len(merged_hits)})")
-            for i, hit in enumerate(merged_hits[:10]):
-                handle = hit.get('handle', 'unknown')
-                sources = '+'.join(hit['_sources'])
-                score = hit['_score']
-                ranking_score = hit['_rankingScore']
-                logger.info(f"  {i+1:2d}. [rank: {ranking_score:.4f}, match: {score}] srcs: {sources:11s} | {handle}")
+            logger.info(f"📊 SEARCH RESULTS (Total: {len(text_hits)})")
+            for i, hit in enumerate(text_hits[:10]):
+                handle        = hit.get("handle", "unknown")
+                ranking_score = hit["_rankingScore"]
+                logger.info(f"  {i+1:2d}. [rank: {ranking_score:.4f}] {handle}")
             logger.info("━" * 60)
 
-        return merged_hits
+        return text_hits
 
 # Singleton instance
 search_service = SearchService()

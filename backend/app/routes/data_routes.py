@@ -1,10 +1,9 @@
-from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, File, Request, UploadFile, Form
+from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Request, UploadFile, File, Form
 from fastapi.responses import HTMLResponse, JSONResponse
 from sqlalchemy.orm import Session
 from typing import Optional
 import io
 import json
-from PIL import Image
 from openai import AsyncOpenAI
 
 from app.config.settings import settings
@@ -44,25 +43,17 @@ async def api_visualize_search(
     color_filter: str = Form(""),
     max_price: Optional[float] = Form(None),
     min_score: Optional[float] = Form(None),
-    image: Optional[UploadFile] = File(None)
 ):
     """
     Backend API for the visual debugger.
-    Handles text embedding, optional image embedding, and hybrid search.
-    Supports optional color_filter and max_price Meilisearch filters.
+    Handles text embedding and hybrid search (text-only, image search removed).
+    Supports optional color_filter, max_price and min_score filters.
     """
-    text_vector  = None
-    image_vector = None
+    text_vector = None
 
-    # 1. Text Embedding (if query provided)
+    # 1. Text Embedding
     if query:
         text_vector = embedding_service.embed_text(query)
-
-    # 2. Image Embedding (if file uploaded)
-    if image:
-        content = await image.read()
-        pil_img = Image.open(io.BytesIO(content))
-        image_vector = embedding_service.embed_image(pil_img)
 
     # 3. Build optional filter string
     filters = []
@@ -72,11 +63,10 @@ async def api_visualize_search(
         filters.append(f"price <= {max_price}")
     filter_str = " AND ".join(filters) if filters else None
 
-    # 4. Hybrid Search
+    # 3. Hybrid Search
     results = search_service.perform_hybrid_search(
         query=query,
         text_vector=text_vector,
-        image_vector=image_vector,
         limit=limit,
         filter_str=filter_str,
         ranking_score_threshold=min_score if min_score and min_score > 0 else None,

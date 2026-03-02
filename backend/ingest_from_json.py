@@ -4,7 +4,7 @@ ingest_from_json.py
 Reads the flat products.json and indexes every product into Meilisearch.
 
 Each document gets:
-  • _vectors.text  – OpenAI embedding of "Title | Type | Tags"  (1536-dim)
+  • _vectors.text  – OpenAI embedding of "Title | Type | Tags"  (1536-dim, text-embedding-3-small)
   • _vectors.image – SigLIP embedding of the product image URL  (768-dim)
 
 Filterable metadata stored alongside:
@@ -34,15 +34,13 @@ sys.path.insert(0, str(BACKEND_DIR))
 
 from app.config.settings import settings
 from app.services.embedding_service import embedding_service
-from app.services.image_caption_service import image_caption_service
 
 import meilisearch
 
 # ── Config ─────────────────────────────────────────────────────────────────────
 INDEX_NAME   = settings.meilisearch_index   # "products" by default
 BATCH_SIZE   = 50                           # upload N docs per Meilisearch call
-TEXT_DIM     = 3072                         # OpenAI text-embedding-3-large
-IMAGE_DIM    = 768                          # SigLIP base
+TEXT_DIM     = 1536                         # OpenAI text-embedding-3-small
 
 
 # ──────────────────────────────────────────────────────────────────────────────
@@ -115,8 +113,7 @@ def configure_index(client: meilisearch.Client):
 
     task = index.update_settings({
         "embedders": {
-            "text":  {"source": "userProvided", "dimensions": TEXT_DIM},
-            "image": {"source": "userProvided", "dimensions": IMAGE_DIM},
+            "text": {"source": "userProvided", "dimensions": TEXT_DIM},
         },
         "filterableAttributes": [
             "color",
@@ -148,11 +145,11 @@ def upload_batch(index, docs: List[Dict[str, Any]], client: meilisearch.Client):
 # Main ingestion loop  (3 phases)
 # ──────────────────────────────────────────────────────────────────────────────
 
-def ingest(json_path: Path, limit: Optional[int], skip_images: bool):
+def ingest(json_path: Path, limit: Optional[int]):
     print(f"\n{'─'*60}")
     print(f"  Source : {json_path}")
     print(f"  Index  : {INDEX_NAME}  @ {settings.meilisearch_url}")
-    print(f"  Images : {'skipped' if skip_images else 'enabled'}")
+    print(f"  Images : disabled (text-only mode)")
     print(f"{'─'*60}\n")
 
     # Load products
@@ -211,18 +208,9 @@ def ingest(json_path: Path, limit: Optional[int], skip_images: bool):
             print(f"❌  ({e})")
             text_vectors.extend([None] * len(chunk))     # keep indices aligned
 
-    # ── PHASE 2 — Batch image embeddings (SigLIP) ─────────────────────────────
-    image_vectors: List[Optional[List[float]]] = [None] * total
+    # ── PHASE 2 — Image embeddings removed (text-only mode) ──────────────────
+    print(f"\n[Phase 2/2] Skipped — image search disabled.")
 
-    if not skip_images:
-        print(f"\n[Phase 2/3] Image embeddings via SigLIP ({total} images, parallel download)…")
-        image_urls = [r["image_url"] for r in rows]
-        # Downloads all URLs concurrently, then runs SigLIP in sub-batches of 16
-        image_vectors = embedding_service.embed_images_batch(image_urls, sub_batch_size=16)
-        ok = sum(1 for v in image_vectors if v is not None)
-        print(f"  ✓ {ok}/{total} images embedded ({total - ok} failed/missing).")
-    else:
-        print(f"\n[Phase 2/3] Skipped (--skip-images).")
 
     # ── PHASE 3 — Assemble documents and upload ───────────────────────────────
     print(f"\n[Phase 3/3] Assembling and uploading to Meilisearch…")
@@ -231,7 +219,6 @@ def ingest(json_path: Path, limit: Optional[int], skip_images: bool):
 
     for i, row in enumerate(rows):
         tv = text_vectors[i]
-        iv = image_vectors[i]
 
         if tv is None:
             print(f"  ⚠️  [{i+1}] No text vector — skipping '{row['title']}'")
@@ -242,8 +229,7 @@ def ingest(json_path: Path, limit: Optional[int], skip_images: bool):
             "id":          row["id"],
             "handle":      row["handle"],
             "sku":         row["sku"],
-            "search_text": row["search_text"],   # only searchable field
-            # ── metadata: filterable, returned in results ──────────────────
+            "search_text": row["search_text"],
             "title":       row["title"],
             "type":        row["type"],
             "color":       row["color"],
@@ -252,10 +238,7 @@ def ingest(json_path: Path, limit: Optional[int], skip_images: bool):
             "price_min":   row["price_min"],
             "price_max":   row["price_max"],
             "image_url":   row["image_url"],
-            "_vectors": {
-                "text": tv,
-                **({"image": iv} if iv is not None else {}),
-            },
+            "_vectors":    {"text": tv},
         }
         docs_batch.append(doc)
 
@@ -292,14 +275,10 @@ if __name__ == "__main__":
         "--limit", type=int, default=None,
         help="Only process the first N products (useful for testing)",
     )
-    parser.add_argument(
-        "--skip-images", action="store_true",
-        help="Skip image embedding (text-only mode, much faster)",
-    )
     args = parser.parse_args()
 
     if not args.file.exists():
         print(f"❌  File not found: {args.file}")
         sys.exit(1)
 
-    ingest(args.file, args.limit, args.skip_images)
+    ingest(args.file, args.limit)

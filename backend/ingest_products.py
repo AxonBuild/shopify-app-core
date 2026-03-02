@@ -86,9 +86,8 @@ async def ingest_products(shop_domain: str):
        1. Fetch all products from Shopify.
        2. For each product:
           a. Extract metadata (colors, sizes, price, category, etc.)
-          b. Embed title+description → text vector  (OpenAI)
-          c. Embed main product image → image vector (SigLIP)
-       3. Upload all documents to Meilisearch (single 'products' index).
+          b. Embed title+description → text vector  (OpenAI text-embedding-3-small, 1536-dim)
+       3. Upload all documents to Meilisearch.
     """
     if not settings.openai_api_key:
         logger.error("OPENAI_API_KEY not set — aborting ingestion.")
@@ -125,18 +124,11 @@ async def ingest_products(shop_domain: str):
     index_name = settings.meilisearch_index
     search_service.update_settings(index_name, {
         "embedders": {
-            "text":  {"source": "userProvided", "dimensions": 1536},
-            "image": {"source": "userProvided", "dimensions": 768},
+            "text": {"source": "userProvided", "dimensions": 1536},
         },
         "filterableAttributes": [
-            "shop_domain",
-            "vendor",
-            "category",
-            "colors",
-            "sizes",
-            "price_min",
-            "price_max",
-            "available",
+            "shop_domain", "vendor", "category",
+            "colors", "sizes", "price_min", "price_max", "available",
         ],
         "searchableAttributes": ["title", "description", "tags", "vendor", "category"],
     })
@@ -175,14 +167,6 @@ async def ingest_products(shop_domain: str):
             _update_status(shop_domain, "processing", total=total, done=idx)
             continue
 
-        # ── Image embedding (SigLIP) ──────────────────────────────────────────
-        image_vector = None
-        if image_url:
-            try:
-                image_vector = embedding_service.embed_image(image_url)
-            except Exception as exc:
-                logger.warning("Image embedding failed for %s: %s — storing text only.", shopify_id, exc)
-
         # ── Build document ────────────────────────────────────────────────────
         doc: Dict[str, Any] = {
             "id":          doc_id,
@@ -199,10 +183,7 @@ async def ingest_products(shop_domain: str):
             "price_max":   price_max,
             "available":   available,
             "image_url":   image_url,
-            "_vectors": {
-                "text": text_vector,
-                **({"image": image_vector} if image_vector else {}),
-            },
+            "_vectors":    {"text": text_vector},
         }
         documents.append(doc)
         _update_status(shop_domain, "processing", total=total, done=idx)

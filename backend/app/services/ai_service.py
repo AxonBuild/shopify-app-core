@@ -199,18 +199,16 @@ class AIService:
     async def _execute_search(
         self,
         text_query: str,
-        original_media_url: Optional[str] = None,
         color: Optional[str] = None,
         max_price: Optional[float] = None,
         exclude_handles: Optional[List[str]] = None,
     ) -> List[Dict[str, Any]]:
         """
-        Executes the actual search by interacting with the embedding and search services.
+        Executes the actual search using OpenAI text embeddings only.
         Result count and score threshold are read from settings (search_top_k, search_min_score).
         exclude_handles: list of product handles to exclude from all search stages.
         """
         text_vector = None
-        image_vector = None
 
         # Build base filter string (color + price)
         filters = []
@@ -239,61 +237,21 @@ class AIService:
         logger.info(f"   color       : {color!r}")
         logger.info(f"   max_price   : {max_price!r}")
         logger.info(f"   filter_str  : {filter_str!r}")
-        logger.info(f"   media_url   : {original_media_url!r}")
+        logger.info(f"   media_url   : (image search disabled)")
         logger.info("━" * 60)
 
-        # ── Parallel Embedding ─────────────────────────────────────────────────
-        # All embedding calls are blocking (torch / OpenAI HTTP). We offload each
-        # to a thread so they run concurrently rather than sequentially.
-        async def _embed_openai():
-            try:
-                return embedding_service.embed_text(text_query)
-            except Exception as e:
-                logger.error(f"OpenAI text embedding failed: {e}")
-                return None
-
-        async def _embed_siglip_text():
-            try:
-                logger.info(f"SigLIP text → visual embedding: '{text_query}'")
-                return await asyncio.to_thread(
-                    embedding_service.embed_query_for_image_search, text_query
-                )
-            except Exception as e:
-                logger.error(f"SigLIP text embedding failed: {e}")
-                return None
-
-        async def _embed_siglip_image():
-            try:
-                logger.info(f"SigLIP image embedding from URL: {original_media_url}")
-                return await asyncio.to_thread(
-                    embedding_service.embed_image, original_media_url
-                )
-            except Exception as e:
-                logger.error(f"SigLIP image embedding failed: {e}")
-                return None
-
-        if original_media_url:
-            # Run all three in parallel: OpenAI text + SigLIP text + SigLIP image
-            text_vector, siglip_text_vector, siglip_image_vector = await asyncio.gather(
-                asyncio.to_thread(embedding_service.embed_text, text_query) if text_query else asyncio.sleep(0),
-                _embed_siglip_text() if text_query else asyncio.sleep(0),
-                _embed_siglip_image()
-            )
-            # Actual image vector takes priority over text-derived SigLIP vector
-            image_vector = siglip_image_vector or siglip_text_vector
-        else:
-            # Run OpenAI + SigLIP text in parallel (no image provided)
-            text_vector, image_vector = await asyncio.gather(
-                asyncio.to_thread(embedding_service.embed_text, text_query) if text_query else asyncio.sleep(0),
-                _embed_siglip_text() if text_query else asyncio.sleep(0)
-            )
+        # ── Embed the text query with OpenAI ───────────────────────────────────
+        try:
+            text_vector = await asyncio.to_thread(embedding_service.embed_text, text_query) if text_query else None
+        except Exception as e:
+            logger.error(f"OpenAI text embedding failed: {e}")
+            text_vector = None
 
         logger.info("━" * 60)
         logger.info("📦 MEILISEARCH PAYLOAD")
         logger.info(f"   query        : {text_query!r}")
         logger.info(f"   filter_str   : {filter_str!r}")
         logger.info(f"   text_vector  : {'✓ ' + str(len(text_vector)) + '-dim' if text_vector else '✗ None'}")
-        logger.info(f"   image_vector : {'✓ ' + str(len(image_vector)) + '-dim' if image_vector else '✗ None'}")
         logger.info(f"   limit        : {settings.search_top_k}")
         logger.info("━" * 60)
 
@@ -302,7 +260,6 @@ class AIService:
             return search_service.perform_hybrid_search(
                 query=text_query,
                 text_vector=text_vector,
-                image_vector=image_vector,
                 limit=settings.search_top_k,
                 filter_str=f_str,
                 ranking_score_threshold=min_score,
