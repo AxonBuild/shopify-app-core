@@ -143,7 +143,6 @@ class AIService:
                         # Execute the search — returns (full_results, ai_context, search_context)
                         full_results, ai_context, search_context = await self._execute_search(
                             text_query=search_query,
-                            original_media_url=media_url,
                             color=color_filter,
                             max_price=max_price,
                             exclude_handles=shown_handles,

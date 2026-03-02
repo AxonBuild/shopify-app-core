@@ -133,7 +133,6 @@ async def api_ai_visualize_search(request: Request):
         results = search_service.perform_hybrid_search(
             query=search_query,
             text_vector=text_vector,
-            image_vector=None,
             limit=limit,
             filter_str=filter_str,
             ranking_score_threshold=min_score if min_score and min_score > 0 else None,
