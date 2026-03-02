@@ -4,11 +4,5 @@ sqlalchemy
 pydantic-settings
 httpx
 meilisearch
-sentence-transformers
-pillow
-torch
 openai
-transformers
-sentencepiece
-protobuf
 python-multipart
