@@ -127,132 +127,437 @@ SEARCH_VISUALIZER_HTML = """
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Visual Search Debugger</title>
-    <script src="https://cdn.tailwindcss.com"></script>
+    <title>Isla Search Visualizer</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
     <style>
-        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap');
-        body { font-family: 'Inter', sans-serif; background-color: #f3f4f6; }
-        .result-card { background: white; border-radius: 12px; overflow: hidden; box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1); transition: transform 0.2s; }
-        .result-card:hover { transform: translateY(-4px); }
-        .badge-both { background-color: #fef3c7; color: #92400e; }
-        .badge-text { background-color: #dcfce7; color: #166534; }
-        .badge-image { background-color: #dbeafe; color: #1e40af; }
+        *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+        :root {
+            --bg:        #0d1117;
+            --surface:   #161b22;
+            --surface2:  #1c2430;
+            --border:    #30363d;
+            --text:      #e6edf3;
+            --muted:     #8b949e;
+            --accent:    #58a6ff;
+            --green:     #3fb950;
+            --yellow:    #d29922;
+            --orange:    #f0883e;
+            --purple:    #bc8cff;
+            --red:       #f85149;
+        }
+
+        body {
+            font-family: 'Inter', sans-serif;
+            background: var(--bg);
+            color: var(--text);
+            min-height: 100vh;
+        }
+
+        /* ── Layout ─────────────────────────────────────────────── */
+        .container { max-width: 1300px; margin: 0 auto; padding: 40px 24px; }
+
+        header { text-align: center; margin-bottom: 40px; }
+        header h1 { font-size: 2rem; font-weight: 800; background: linear-gradient(135deg, var(--accent), var(--purple)); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
+        header p  { color: var(--muted); margin-top: 8px; font-size: 0.95rem; }
+
+        /* ── Mode tabs ──────────────────────────────────────────── */
+        .tabs { display: flex; gap: 8px; margin-bottom: 24px; border-bottom: 1px solid var(--border); padding-bottom: 0; }
+        .tab  { padding: 10px 20px; font-size: 0.9rem; font-weight: 600; border: none; border-radius: 8px 8px 0 0; cursor: pointer; background: transparent; color: var(--muted); transition: all .2s; border-bottom: 2px solid transparent; }
+        .tab.active { color: var(--accent); border-bottom-color: var(--accent); background: rgba(88,166,255,.07); }
+
+        /* ── Search panel ───────────────────────────────────────── */
+        .panel { background: var(--surface); border: 1px solid var(--border); border-radius: 16px; padding: 28px; margin-bottom: 28px; }
+        label  { display: block; font-size: 0.8rem; font-weight: 600; color: var(--muted); text-transform: uppercase; letter-spacing: .05em; margin-bottom: 8px; }
+
+        input[type="text"], select {
+            width: 100%; padding: 12px 16px; background: var(--bg);
+            border: 1px solid var(--border); border-radius: 10px;
+            color: var(--text); font-family: inherit; font-size: .95rem;
+            outline: none; transition: border-color .2s;
+        }
+        input[type="text"]:focus, select:focus { border-color: var(--accent); }
+        input[type="file"] { color: var(--muted); font-size: .85rem; }
+
+        .row { display: flex; gap: 16px; align-items: flex-end; }
+        .row .grow { flex: 1; }
+        .row .w32 { width: 120px; }
+
+        .btn {
+            width: 100%; padding: 14px; margin-top: 20px;
+            background: var(--accent); color: #000; border: none;
+            border-radius: 12px; font-size: .95rem; font-weight: 700;
+            cursor: pointer; transition: opacity .2s;
+        }
+        .btn:hover { opacity: .85; }
+        .btn.secondary { background: var(--surface2); color: var(--text); border: 1px solid var(--border); }
+
+        /* ── AI Extraction Panel ────────────────────────────────── */
+        .ai-panel {
+            background: var(--surface); border: 1px solid var(--border);
+            border-radius: 16px; padding: 24px; margin-bottom: 28px;
+            display: none;
+        }
+        .ai-panel.visible { display: block; }
+        .ai-panel-title { font-size: .75rem; font-weight: 700; text-transform: uppercase; letter-spacing: .08em; color: var(--purple); margin-bottom: 16px; display: flex; align-items: center; gap: 8px; }
+        .ai-panel-title::before { content: ''; width: 8px; height: 8px; background: var(--purple); border-radius: 50%; display: inline-block; animation: pulse 1.5s infinite; }
+        @keyframes pulse { 0%,100% { opacity: 1; } 50% { opacity: .4; } }
+
+        .ai-msg { font-size: .9rem; color: var(--text); margin-bottom: 16px; font-style: italic; }
+
+        .tags { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 16px; }
+        .tag  { padding: 5px 12px; border-radius: 20px; font-size: .78rem; font-weight: 600; font-family: 'JetBrains Mono', monospace; }
+        .tag.query  { background: rgba(88,166,255,.12); color: var(--accent); border: 1px solid rgba(88,166,255,.3); }
+        .tag.color  { background: rgba(63,185,80,.12);  color: var(--green);  border: 1px solid rgba(63,185,80,.3); }
+        .tag.price  { background: rgba(240,136,62,.12); color: var(--orange); border: 1px solid rgba(240,136,62,.3); }
+        .tag.filter { background: rgba(210,153,34,.12); color: var(--yellow); border: 1px solid rgba(210,153,34,.3); }
+        .tag.none   { background: rgba(139,148,158,.1); color: var(--muted);  border: 1px solid var(--border); }
+        .tag.model  { background: rgba(188,140,255,.1); color: var(--purple); border: 1px solid rgba(188,140,255,.3); }
+
+        .ai-meta { display: flex; gap: 16px; font-size: .75rem; color: var(--muted); border-top: 1px solid var(--border); padding-top: 12px; margin-top: 4px; }
+        .ai-meta span b { color: var(--text); }
+
+        /* ── Results ─────────────────────────────────────────────── */
+        .results-header { font-size: .75rem; font-weight: 700; text-transform: uppercase; letter-spacing: .08em; color: var(--muted); margin-bottom: 16px; }
+        .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 16px; }
+
+        .card {
+            background: var(--surface); border: 1px solid var(--border);
+            border-radius: 14px; overflow: hidden; transition: transform .2s, border-color .2s;
+        }
+        .card:hover { transform: translateY(-4px); border-color: var(--accent); }
+        .card img { width: 100%; aspect-ratio: 1; object-fit: cover; background: var(--surface2); }
+        .card-body { padding: 12px 14px; }
+        .card-title { font-size: .85rem; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; margin-bottom: 4px; }
+        .card-type  { font-size: .72rem; color: var(--muted); margin-bottom: 8px; }
+        .card-price { font-size: .85rem; font-weight: 700; color: var(--green); }
+        .card-meta  { font-size: .7rem; color: var(--muted); margin-top: 3px; }
+        .card-score { font-size: .7rem; font-family: 'JetBrains Mono', monospace; color: var(--muted); margin-top: 6px; }
+        .card-badge { display: inline-block; padding: 2px 8px; border-radius: 6px; font-size: .65rem; font-weight: 700; text-transform: uppercase; }
+        .badge-both  { background: rgba(210,153,34,.2); color: var(--yellow); }
+        .badge-text  { background: rgba(63,185,80,.2);  color: var(--green); }
+        .badge-image { background: rgba(88,166,255,.2); color: var(--accent); }
+        .card-actions { margin-top: 10px; }
+        .card-actions a { display: block; text-align: center; font-size: .75rem; font-weight: 600; padding: 7px; background: var(--surface2); border-radius: 8px; color: var(--text); text-decoration: none; transition: background .2s; }
+        .card-actions a:hover { background: var(--border); }
+
+        /* ── Loading spinner ───────────────────────────────────── */
+        .loading { display: none; text-align: center; padding: 40px; }
+        .spinner { width: 40px; height: 40px; border: 3px solid var(--border); border-top-color: var(--accent); border-radius: 50%; animation: spin .8s linear infinite; margin: 0 auto 12px; }
+        @keyframes spin { to { transform: rotate(360deg); } }
+        .loading p { color: var(--muted); font-size: .9rem; }
+
+        .empty { text-align: center; padding: 60px 20px; color: var(--muted); }
+        .empty div { font-size: 2.5rem; margin-bottom: 12px; }
+
+        /* ── Score slider ──────────────────────────────────────── */
+        .slider-row { margin-top: 16px; }
+        .slider-row label { display: flex; justify-content: space-between; align-items: center; }
+        .slider-label-val { font-family: 'JetBrains Mono', monospace; font-size: .8rem;
+                            color: var(--accent); font-weight: 700; }
+        .slider-hint { font-size: .7rem; color: var(--muted); margin-top: 4px; }
+        input[type=range] {
+            -webkit-appearance: none; appearance: none;
+            width: 100%; height: 4px; border-radius: 4px;
+            background: var(--border); outline: none; cursor: pointer;
+        }
+        input[type=range]::-webkit-slider-thumb {
+            -webkit-appearance: none; appearance: none;
+            width: 16px; height: 16px; border-radius: 50%;
+            background: var(--accent); cursor: pointer;
+            box-shadow: 0 0 6px rgba(88,166,255,.5);
+        }
     </style>
 </head>
-<body class="min-h-screen">
-    <div class="max-w-7xl mx-auto px-4 py-12">
-        <header class="mb-12 text-center">
-            <h1 class="text-4xl font-extrabold text-gray-900 mb-4">Visual Search Debugger</h1>
-            <p class="text-lg text-gray-600">Test hybrid search across text and image embeddings in real-time.</p>
-        </header>
+<body>
+<div class="container">
+    <header>
+        <h1>Isla Search Visualizer</h1>
+        <p>Debug the hybrid search pipeline — with or without the AI extraction layer</p>
+    </header>
 
-        <section class="max-w-3xl mx-auto bg-white rounded-2xl p-8 shadow-sm mb-12 border border-gray-100">
-            <form id="searchForm" class="space-y-6">
-                <div>
-                    <label class="block text-sm font-semibold text-gray-700 mb-2">Text Query</label>
-                    <input type="text" id="queryInput" placeholder="e.g. black cargo pants" 
-                           class="w-full px-4 py-3 rounded-lg border border-gray-300 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition">
-                </div>
-                
-                <div class="flex items-center space-x-4">
-                    <div class="flex-1">
-                        <label class="block text-sm font-semibold text-gray-700 mb-2">Image Search (Visual Intent)</label>
-                        <input type="file" id="imageInput" accept="image/*" 
-                               class="w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100">
-                    </div>
-                    <div class="w-32">
-                        <label class="block text-sm font-semibold text-gray-700 mb-2">Limit</label>
-                        <select id="limitSelect" class="w-full px-3 py-2.5 rounded-lg border border-gray-300">
-                            <option value="4">4</option>
-                            <option value="8" selected>8</option>
-                            <option value="12">12</option>
-                            <option value="20">20</option>
-                        </select>
-                    </div>
-                </div>
-
-                <button type="submit" class="w-full bg-blue-600 text-white font-bold py-4 rounded-xl hover:bg-blue-700 transition shadow-lg shadow-blue-200">
-                    Execute Hybrid Search
-                </button>
-            </form>
-        </section>
-
-        <div id="loading" class="hidden text-center py-12">
-            <div class="inline-block animate-spin rounded-full h-12 w-12 border-4 border-blue-600 border-t-transparent"></div>
-            <p class="mt-4 text-gray-500 font-medium">Embedding and searching...</p>
-        </div>
-
-        <div id="resultsGrid" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-8">
-            <!-- Results populated here -->
-        </div>
+    <!-- Mode Tabs -->
+    <div class="tabs">
+        <button class="tab active" id="tabAI"     onclick="switchTab('ai')">🤖 AI Search (with tool call)</button>
+        <button class="tab"        id="tabDirect" onclick="switchTab('direct')">⚡ Direct Search (no AI)</button>
     </div>
 
-    <script>
-        document.getElementById('searchForm').addEventListener('submit', async (e) => {
-            e.preventDefault();
-            const query = document.getElementById('queryInput').value;
-            const imageFile = document.getElementById('imageInput').files[0];
-            const limit = document.getElementById('limitSelect').value;
+    <!-- ── AI Search Panel ─────────────────────────────────────── -->
+    <div id="panelAI">
+        <div class="panel">
+            <div style="margin-bottom:16px">
+                <label>Natural Language Query</label>
+                <input type="text" id="aiQuery" placeholder="e.g. Mujhe navy wali jeans chahiye 1200 se kam mein" />
+            </div>
+            <div class="row">
+                <div class="grow">
+                    <label>Results to Fetch</label>
+                    <select id="aiLimit">
+                        <option value="4">4</option>
+                        <option value="6" selected>6</option>
+                        <option value="9">9</option>
+                        <option value="12">12</option>
+                    </select>
+                </div>
+            </div>
+            <div class="slider-row">
+                <label>
+                    Min Score Threshold
+                    <span class="slider-label-val" id="aiScoreVal">0.00 (off)</span>
+                </label>
+                <input type="range" id="aiScore" min="0" max="1" step="0.05" value="0"
+                       oninput="updateSlider('aiScore','aiScoreVal')">
+                <div class="slider-hint">Drag right to filter out low-relevance results &nbsp;·&nbsp; production default: <b>0.70</b> (Stage 4 only)</div>
+            </div>
+            <button class="btn" onclick="runAISearch()">🤖 Run AI Search (forced tool call)</button>
+        </div>
 
-            const grid = document.getElementById('resultsGrid');
-            const loading = document.getElementById('loading');
-            grid.innerHTML = '';
-            loading.classList.remove('hidden');
+        <!-- AI Extraction Badge Panel -->
+        <div class="ai-panel" id="aiPanel">
+            <div class="ai-panel-title">🧠 AI Tool Call Extraction</div>
+            <div class="ai-msg" id="aiMessage"></div>
+            <div class="tags" id="aiTags"></div>
+            <div class="ai-meta" id="aiMeta"></div>
+        </div>
 
-            try {
-                const formData = new FormData();
-                formData.append('query', query);
-                formData.append('limit', limit);
-                if (imageFile) formData.append('image', imageFile);
+        <div class="loading" id="aiLoading">
+            <div class="spinner"></div>
+            <p id="aiLoadingMsg">Calling AI... extracting search parameters...</p>
+        </div>
+        <div class="results-header" id="aiResultsHeader" style="display:none"></div>
+        <div class="grid" id="aiGrid"></div>
+    </div>
 
-                const response = await fetch('/api/search/visualize', {
-                    method: 'POST',
-                    body: formData
-                });
+    <!-- ── Direct Search Panel ─────────────────────────────────── -->
+    <div id="panelDirect" style="display:none">
+        <div class="panel">
+            <div style="margin-bottom:16px">
+                <label>Text Query</label>
+                <input type="text" id="directQuery" placeholder="e.g. black cargo pants" />
+            </div>
+            <div class="row">
+                <div class="grow">
+                    <label>Color Filter</label>
+                    <select id="directColor">
+                        <option value="">— Any color —</option>
+                        <option>BLACK</option><option>NAVY</option><option>WHITE</option>
+                        <option>GREY</option><option>RED</option><option>BLUE</option>
+                        <option>YELLOW</option><option>LIGHT BLUE</option><option>DARK BLUE</option>
+                        <option>ORANGE</option><option>GREEN</option><option>CHARCOAL</option>
+                        <option>AQUA</option><option>BROWN</option><option>SKIN</option>
+                        <option>KHAKI</option><option>OLIVE</option><option>BEIGE</option>
+                        <option>MUSTARD</option><option>ROYAL BLUE</option>
+                    </select>
+                </div>
+                <div class="grow">
+                    <label>Max Price (PKR)</label>
+                    <input type="text" id="directPrice" placeholder="e.g. 1200" />
+                </div>
+                <div class="w32">
+                    <label>Limit</label>
+                    <select id="directLimit">
+                        <option value="4">4</option>
+                        <option value="8" selected>8</option>
+                        <option value="12">12</option>
+                        <option value="20">20</option>
+                    </select>
+                </div>
+            </div>
+            <div style="margin-top:16px">
+                <label>Image Search (Visual Intent)</label>
+                <input type="file" id="directImage" accept="image/*" />
+            </div>
+            <div class="slider-row">
+                <label>
+                    Min Score Threshold
+                    <span class="slider-label-val" id="directScoreVal">0.00 (off)</span>
+                </label>
+                <input type="range" id="directScore" min="0" max="1" step="0.05" value="0"
+                       oninput="updateSlider('directScore','directScoreVal')">
+                <div class="slider-hint">Drag right to filter out low-relevance results &nbsp;·&nbsp; production default: <b>0.70</b> (Stage 4 only)</div>
+            </div>
+            <button class="btn secondary" onclick="runDirectSearch()">⚡ Execute Hybrid Search</button>
+        </div>
 
-                const data = await response.json();
-                loading.classList.add('hidden');
+        <div class="loading" id="directLoading">
+            <div class="spinner"></div>
+            <p>Embedding and searching...</p>
+        </div>
+        <div class="results-header" id="directResultsHeader" style="display:none"></div>
+        <div class="grid" id="directGrid"></div>
+    </div>
+</div>
 
-                if (data.results.length === 0) {
-                    grid.innerHTML = '<div class="col-span-full text-center py-12 text-gray-500">No products found for this query.</div>';
-                    return;
-                }
+<script>
+    // ── Slider helper ─────────────────────────────────────────────
+    function updateSlider(sliderId, valId) {
+        const v = parseFloat(document.getElementById(sliderId).value);
+        document.getElementById(valId).textContent = v === 0 ? '0.00 (off)' : v.toFixed(2);
+    }
 
-                data.results.forEach(item => {
-                    const badgeClass = item._score === 2 ? 'badge-both' : (item._sources.includes('text') ? 'badge-text' : 'badge-image');
-                    const badgeText = item._score === 2 ? 'Text + Image' : (item._sources.includes('text') ? 'Text Match' : 'Image Match');
-                    
-                    const card = `
-                        <div class="result-card">
-                            <div class="relative aspect-square">
-                                <img src="${item.image_url || 'https://via.placeholder.com/300'}" class="w-full h-full object-cover">
-                                <div class="absolute top-2 right-2 px-2 py-1 rounded-md text-[10px] font-bold uppercase ${badgeClass} shadow-sm">
-                                    ${badgeText}
-                                </div>
-                            </div>
-                            <div class="p-4">
-                                <h3 class="font-bold text-gray-900 truncate mb-1">${item.title}</h3>
-                                <p class="text-xs text-gray-500 mb-3">${item.type}</p>
-                                <div class="flex justify-between items-end">
-                                    <span class="text-blue-600 font-bold">PKR ${item.price ? item.price.toLocaleString() : 'N/A'}</span>
-                                    <span class="text-[10px] text-gray-400 font-medium">${item.color || 'N/A'} | ${item.size || 'N/A'}</span>
-                                </div>
-                                <a href="https://ismailsclothing.com/products/${item.handle}" target="_blank" 
-                                   class="mt-4 block text-center text-xs font-semibold py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition">
-                                    View Product
-                                </a>
-                            </div>
-                        </div>
-                    `;
-                    grid.insertAdjacentHTML('beforeend', card);
-                });
+    // ── Tab switching ─────────────────────────────────────────────
+    function switchTab(mode) {
+        document.getElementById('panelAI').style.display     = mode === 'ai'     ? '' : 'none';
+        document.getElementById('panelDirect').style.display = mode === 'direct' ? '' : 'none';
+        document.getElementById('tabAI').classList.toggle('active',     mode === 'ai');
+        document.getElementById('tabDirect').classList.toggle('active', mode === 'direct');
+    }
 
-            } catch (err) {
-                loading.classList.add('hidden');
-                alert('Search failed: ' + err.message);
-            }
-        });
-    </script>
+    // ── Card builder ──────────────────────────────────────────────
+    function buildCard(item) {
+        const badgeClass = item._score === 2 ? 'badge-both' : (item._sources?.includes('text') ? 'badge-text' : 'badge-image');
+        const badgeText  = item._score === 2 ? 'Text+Image' : (item._sources?.includes('text') ? 'Text' : 'Image');
+        const score      = item._rankingScore ? item._rankingScore.toFixed(3) : '—';
+        return `
+            <div class="card">
+                <img src="${item.image_url || 'https://placehold.co/300x300/1c2430/8b949e?text=?'}" alt="${item.title}" loading="lazy">
+                <div class="card-body">
+                    <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:6px">
+                        <span class="card-badge ${badgeClass}">${badgeText}</span>
+                        <span style="font-size:.7rem;font-family:'JetBrains Mono',monospace;color:var(--muted)">⭐${score}</span>
+                    </div>
+                    <div class="card-title">${item.title}</div>
+                    <div class="card-type">${item.type || ''}</div>
+                    <div class="card-price">PKR ${item.price ? item.price.toLocaleString() : 'N/A'}</div>
+                    <div class="card-meta">${item.color || '—'} · ${item.handle}</div>
+                    <div class="card-actions">
+                        <a href="https://ismailsclothing.com/products/${item.handle}" target="_blank">View Product ↗</a>
+                    </div>
+                </div>
+            </div>`;
+    }
+
+    function showEmpty(gridId) {
+        document.getElementById(gridId).innerHTML =
+            '<div class="empty" style="grid-column:1/-1"><div>🔍</div>No products found for this query.</div>';
+    }
+
+    // ── AI Search ─────────────────────────────────────────────────
+    async function runAISearch() {
+        const query = document.getElementById('aiQuery').value.trim();
+        if (!query) { alert('Please enter a query.'); return; }
+
+        const limit    = document.getElementById('aiLimit').value;
+        const minScore = parseFloat(document.getElementById('aiScore').value);
+        const grid     = document.getElementById('aiGrid');
+        const loading  = document.getElementById('aiLoading');
+        const aiPanel  = document.getElementById('aiPanel');
+        const aiHeader = document.getElementById('aiResultsHeader');
+        const loadMsg  = document.getElementById('aiLoadingMsg');
+
+        grid.innerHTML = '';
+        aiPanel.classList.remove('visible');
+        aiHeader.style.display = 'none';
+        loading.style.display  = 'block';
+        loadMsg.textContent    = 'Step 1/2 — Calling AI (forced tool call)...';
+
+        try {
+            const res  = await fetch('/api/search/ai-visualize', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ query, limit: parseInt(limit), min_score: minScore > 0 ? minScore : null })
+            });
+            const data = await res.json();
+
+            if (data.error) { alert('Error: ' + data.error); loading.style.display = 'none'; return; }
+
+            loading.style.display = 'none';
+
+            // ── Render AI extraction panel ──────────────────────
+            const ex = data.ai_extraction;
+            document.getElementById('aiMessage').textContent = '"' + ex.searching_message + '"';
+
+            const tagsEl = document.getElementById('aiTags');
+            tagsEl.innerHTML = '';
+            const addTag = (label, val, cls) => {
+                tagsEl.insertAdjacentHTML('beforeend',
+                    `<span class="tag ${cls}"><b>${label}:</b> ${val}</span>`);
+            };
+            addTag('search_query',  ex.search_query,               'query');
+            addTag('color_filter',  ex.color_filter  || 'none',    ex.color_filter  ? 'color'  : 'none');
+            addTag('max_price',     ex.max_price != null ? 'PKR ' + ex.max_price : 'none', ex.max_price != null ? 'price' : 'none');
+            addTag('filter_str',    ex.filter_str    || 'none',    ex.filter_str    ? 'filter' : 'none');
+            if (minScore > 0) addTag('min_score', minScore.toFixed(2), 'filter');
+
+            document.getElementById('aiMeta').innerHTML =
+                `<span>Model: <b>${ex.model}</b></span>
+                 <span>Prompt tokens: <b>${ex.prompt_tokens ?? '—'}</b></span>
+                 <span>Completion tokens: <b>${ex.completion_tokens ?? '—'}</b></span>`;
+
+            aiPanel.classList.add('visible');
+
+            // ── Render results ──────────────────────────────────
+            const count = data.results.length;
+            aiHeader.style.display = '';
+            aiHeader.textContent   = `${count} product${count !== 1 ? 's' : ''} returned`;
+
+            if (count === 0) { showEmpty('aiGrid'); return; }
+            data.results.forEach(item => grid.insertAdjacentHTML('beforeend', buildCard(item)));
+
+        } catch (err) {
+            loading.style.display = 'none';
+            alert('Request failed: ' + err.message);
+        }
+    }
+
+    // ── Direct Search ─────────────────────────────────────────────
+    async function runDirectSearch() {
+        const query      = document.getElementById('directQuery').value;
+        const imageFile  = document.getElementById('directImage').files[0];
+        const limit      = document.getElementById('directLimit').value;
+        const color      = document.getElementById('directColor').value;
+        const maxPrice   = document.getElementById('directPrice').value;
+        const minScore   = parseFloat(document.getElementById('directScore').value);
+        const grid       = document.getElementById('directGrid');
+        const loading    = document.getElementById('directLoading');
+        const header     = document.getElementById('directResultsHeader');
+
+        grid.innerHTML = '';
+        header.style.display  = 'none';
+        loading.style.display = 'block';
+
+        try {
+            const formData = new FormData();
+            formData.append('query', query);
+            formData.append('limit', limit);
+            if (color)         formData.append('color_filter', color);
+            if (maxPrice)      formData.append('max_price', maxPrice);
+            if (minScore > 0)  formData.append('min_score', minScore);
+            if (imageFile) formData.append('image', imageFile);
+
+            const res  = await fetch('/api/search/visualize', { method: 'POST', body: formData });
+            const data = await res.json();
+            loading.style.display = 'none';
+
+            // Show active filters
+            const parts = [];
+            if (color)        parts.push(`color=${color}`);
+            if (maxPrice)     parts.push(`max_price≤${maxPrice}`);
+            if (minScore > 0) parts.push(`min_score≥${minScore.toFixed(2)}`);
+            const filterNote = parts.length ? ` · filters: ${parts.join(', ')}` : '';
+
+            const count = data.results.length;
+            header.style.display = '';
+            header.textContent   = `${count} product${count !== 1 ? 's' : ''} returned${filterNote}`;
+
+            if (count === 0) { showEmpty('directGrid'); return; }
+            data.results.forEach(item => grid.insertAdjacentHTML('beforeend', buildCard(item)));
+
+        } catch (err) {
+            loading.style.display = 'none';
+            alert('Search failed: ' + err.message);
+        }
+    }
+
+    // Enter key support
+    document.addEventListener('keydown', e => {
+        if (e.key !== 'Enter') return;
+        if (document.getElementById('panelAI').style.display !== 'none') runAISearch();
+        else runDirectSearch();
+    });
+</script>
 </body>
 </html>
 """
+
