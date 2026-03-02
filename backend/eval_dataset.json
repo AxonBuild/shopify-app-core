@@ -1,0 +1,790 @@
+{
+    "meta": {
+        "description": "Golden evaluation dataset for Isla RAG pipeline — manually crafted from 100 ingested products",
+        "total_queries": 30,
+        "catalog_size": 100,
+        "index": "shopify-app-index",
+        "top_k": 3,
+        "created_at": "2026-03-02",
+        "notes": "expected_products lists the top-3 products that SHOULD appear in search results for each query. Handles are exact Meilisearch document handles."
+    },
+    "queries": [
+        {
+            "id": "Q01",
+            "category": "color_type",
+            "query": "black t-shirt for boys",
+            "color_filter": "BLACK",
+            "max_price": null,
+            "expected_products": [
+                {
+                    "handle": "be25112-blk",
+                    "title": "BOY T SHIRT",
+                    "color": "BLACK",
+                    "price": 979.0
+                },
+                {
+                    "handle": "be25110-blk",
+                    "title": "Transformers Printed T-shirt",
+                    "color": "BLACK",
+                    "price": 979.0
+                },
+                {
+                    "handle": "be25139-blk",
+                    "title": "BOY T SHIRT",
+                    "color": "BLACK",
+                    "price": 909.0
+                }
+            ],
+            "notes": "Most popular color (19 products) + most popular category (38 t-shirts). Must always return 3 results."
+        },
+        {
+            "id": "Q02",
+            "category": "color_type",
+            "query": "navy blue t-shirt boys",
+            "color_filter": "NAVY",
+            "max_price": null,
+            "expected_products": [
+                {
+                    "handle": "be25105-nvy",
+                    "title": "BOY T SHIRT",
+                    "color": "NAVY",
+                    "price": 839.0
+                },
+                {
+                    "handle": "be25106-nvy",
+                    "title": "BOY T SHIRT",
+                    "color": "NAVY",
+                    "price": 839.0
+                },
+                {
+                    "handle": "be25111-nvy",
+                    "title": "BOY T SHIRT",
+                    "color": "NAVY",
+                    "price": 979.0
+                }
+            ],
+            "notes": "NAVY is 2nd most common color. 8 navy t-shirts in catalog — should easily return 3."
+        },
+        {
+            "id": "Q03",
+            "category": "color_type",
+            "query": "white t-shirt for kids",
+            "color_filter": "WHITE",
+            "max_price": null,
+            "expected_products": [
+                {
+                    "handle": "be24102-wht",
+                    "title": "Boy Graphic Tee",
+                    "color": "WHITE",
+                    "price": 555.0
+                },
+                {
+                    "handle": "be24115-wht",
+                    "title": "Boy Graphic Tee",
+                    "color": "WHITE",
+                    "price": 480.0
+                },
+                {
+                    "handle": "be25115-wht",
+                    "title": "BOY T SHIRT",
+                    "color": "WHITE",
+                    "price": 1049.0
+                }
+            ],
+            "notes": "WHITE + t-shirt — 6 white t-shirts available. Should return 3."
+        },
+        {
+            "id": "Q04",
+            "category": "color_type",
+            "query": "grey t-shirt for boys",
+            "color_filter": "GREY",
+            "max_price": null,
+            "expected_products": [
+                {
+                    "handle": "be24111-gry",
+                    "title": "Boy Graphic Tee",
+                    "color": "GREY",
+                    "price": 450.0
+                },
+                {
+                    "handle": "be25102-gry",
+                    "title": "Printed Round Neck T-shirt",
+                    "color": "GREY",
+                    "price": 909.0
+                },
+                {
+                    "handle": "be25127-gry",
+                    "title": "BOY T SHIRT",
+                    "color": "GREY",
+                    "price": 979.0
+                }
+            ],
+            "notes": "GREY + t-shirt — exactly 3 grey t-shirts available. Precision should be 100%."
+        },
+        {
+            "id": "Q05",
+            "category": "color_type",
+            "query": "blue jeans for boys",
+            "color_filter": "BLUE",
+            "max_price": null,
+            "expected_products": [
+                {
+                    "handle": "be24051-blu",
+                    "title": "Boy Skinny Jeans",
+                    "color": "BLUE",
+                    "price": 1125.0
+                },
+                {
+                    "handle": "be24052-blu",
+                    "title": "Boy Denim Jeans",
+                    "color": "BLUE",
+                    "price": 1155.0
+                },
+                {
+                    "handle": "be24054-blu",
+                    "title": "Boy Denim Jeans",
+                    "color": "BLUE",
+                    "price": 1185.0
+                }
+            ],
+            "notes": "BLUE + jeans — 3 blue jean products. Expect all 3 to return."
+        },
+        {
+            "id": "Q06",
+            "category": "color_type",
+            "query": "red casual shirt for kids",
+            "color_filter": "RED",
+            "max_price": null,
+            "expected_products": [
+                {
+                    "handle": "be24003-red",
+                    "title": "Boy Check Casual Shirt",
+                    "color": "RED",
+                    "price": 795.0
+                },
+                {
+                    "handle": "be24005-red",
+                    "title": "Boy Hoodie Style Casual Shirt",
+                    "color": "RED",
+                    "price": 795.0
+                }
+            ],
+            "notes": "RED + casual shirt — 2 products. Min expected count: 2."
+        },
+        {
+            "id": "Q07",
+            "category": "color_type",
+            "query": "yellow casual shirt boys",
+            "color_filter": "YELLOW",
+            "max_price": null,
+            "expected_products": [
+                {
+                    "handle": "be24004-ylw",
+                    "title": "Boy Check Casual Shirt",
+                    "color": "YELLOW",
+                    "price": 795.0
+                },
+                {
+                    "handle": "be25003-ylw",
+                    "title": "BOY CASUAL SHIRT",
+                    "color": "YELLOW",
+                    "price": 1749.0
+                },
+                {
+                    "handle": "be25006-ylw",
+                    "title": "BOY CASUAL SHIRT",
+                    "color": "YELLOW",
+                    "price": 2099.0
+                }
+            ],
+            "notes": "YELLOW + casual shirt — 3 products across different price points."
+        },
+        {
+            "id": "Q08",
+            "category": "color_type",
+            "query": "dark blue jeans for boys",
+            "color_filter": "DARK BLUE",
+            "max_price": null,
+            "expected_products": [
+                {
+                    "handle": "be23052-dbl",
+                    "title": "D Blue Jeans",
+                    "color": "DARK BLUE",
+                    "price": 960.0
+                },
+                {
+                    "handle": "be24058-dbl",
+                    "title": "Boy Graphic Jeans",
+                    "color": "DARK BLUE",
+                    "price": 1050.0
+                },
+                {
+                    "handle": "be25052-dbl",
+                    "title": "BOY JEANs",
+                    "color": "DARK BLUE",
+                    "price": 2659.0
+                }
+            ],
+            "notes": "DARK BLUE + jeans — tests two-word color extraction."
+        },
+        {
+            "id": "Q09",
+            "category": "color_type",
+            "query": "light blue jeans kids",
+            "color_filter": "LIGHT BLUE",
+            "max_price": null,
+            "expected_products": [
+                {
+                    "handle": "be23051-lbl",
+                    "title": "L Blue Jeans",
+                    "color": "LIGHT BLUE",
+                    "price": 960.0
+                },
+                {
+                    "handle": "be24054-lbl",
+                    "title": "Boy Denim Jeans",
+                    "color": "LIGHT BLUE",
+                    "price": 1185.0
+                },
+                {
+                    "handle": "be24057-lbl",
+                    "title": "Boy Double Shade Pant",
+                    "color": "LIGHT BLUE",
+                    "price": 960.0
+                }
+            ],
+            "notes": "LIGHT BLUE + jeans — 5 light blue products but 3 are jeans."
+        },
+        {
+            "id": "Q10",
+            "category": "color_type",
+            "query": "polo shirt for boys",
+            "color_filter": null,
+            "max_price": null,
+            "expected_products": [
+                {
+                    "handle": "be25151-red",
+                    "title": "Contrast Paneled Polo",
+                    "color": "RED",
+                    "price": 1399.0
+                },
+                {
+                    "handle": "be25151-ylw",
+                    "title": "Contrast Paneled Polo",
+                    "color": "YELLOW",
+                    "price": 1399.0
+                },
+                {
+                    "handle": "be25152-grn",
+                    "title": "BOY POLO",
+                    "color": "GREEN",
+                    "price": 1399.0
+                }
+            ],
+            "notes": "POLO type — only 3 polo products in catalog. Should return all 3."
+        },
+        {
+            "id": "Q11",
+            "category": "price_filter",
+            "query": "cheap boys t-shirt under 600",
+            "color_filter": null,
+            "max_price": 600,
+            "expected_products": [
+                {
+                    "handle": "be24111-gry",
+                    "title": "Boy Graphic Tee",
+                    "color": "GREY",
+                    "price": 450.0
+                },
+                {
+                    "handle": "be24104-hgy",
+                    "title": "Boy Graphic Tee",
+                    "color": "HEATHER GREY",
+                    "price": 480.0
+                },
+                {
+                    "handle": "be24107-aqu",
+                    "title": "Boy Graphic Tee",
+                    "color": "AQUA",
+                    "price": 480.0
+                }
+            ],
+            "notes": "Strict budget filter ≤ 600 PKR. Only 5 products qualify — cheapest graphic tees."
+        },
+        {
+            "id": "Q12",
+            "category": "price_filter",
+            "query": "t-shirt under 1000 PKR",
+            "color_filter": null,
+            "max_price": 1000,
+            "expected_products": [
+                {
+                    "handle": "be24111-gry",
+                    "title": "Boy Graphic Tee",
+                    "color": "GREY",
+                    "price": 450.0
+                },
+                {
+                    "handle": "be25105-nvy",
+                    "title": "BOY T SHIRT",
+                    "color": "NAVY",
+                    "price": 839.0
+                },
+                {
+                    "handle": "be25103-chr",
+                    "title": "Short Sleeve Graphic t-shirt",
+                    "color": "CHARCOL",
+                    "price": 839.0
+                },
+                {
+                    "handle": "be25102-gry",
+                    "title": "Printed Round Neck T-shirt",
+                    "color": "GREY",
+                    "price": 909.0
+                },
+                {
+                    "handle": "be25106-nvy",
+                    "title": "BOY T SHIRT",
+                    "color": "NAVY",
+                    "price": 839.0
+                },
+                {
+                    "handle": "be25116-blk",
+                    "title": "BOY T SHIRT",
+                    "color": "BLACK",
+                    "price": 979.0
+                }
+            ],
+            "notes": "47 products in 501-1000 band — should easily return 3 relevant t-shirts. Multiple valid handles accepted."
+        },
+        {
+            "id": "Q13",
+            "category": "price_filter",
+            "query": "black t-shirt under 1000 PKR",
+            "color_filter": "BLACK",
+            "max_price": 1000,
+            "expected_products": [
+                {
+                    "handle": "be25139-blk",
+                    "title": "BOY T SHIRT",
+                    "color": "BLACK",
+                    "price": 909.0
+                },
+                {
+                    "handle": "be25112-blk",
+                    "title": "BOY T SHIRT",
+                    "color": "BLACK",
+                    "price": 979.0
+                },
+                {
+                    "handle": "be25116-blk",
+                    "title": "BOY T SHIRT",
+                    "color": "BLACK",
+                    "price": 979.0
+                }
+            ],
+            "notes": "Color + price combo. Narrows the 19 black products to those under 1000."
+        },
+        {
+            "id": "Q14",
+            "category": "price_filter",
+            "query": "boys jeans under 1200 PKR",
+            "color_filter": null,
+            "max_price": 1200,
+            "expected_products": [
+                {
+                    "handle": "be23051-lbl",
+                    "title": "L Blue Jeans",
+                    "color": "LIGHT BLUE",
+                    "price": 960.0
+                },
+                {
+                    "handle": "be23052-dbl",
+                    "title": "D Blue Jeans",
+                    "color": "DARK BLUE",
+                    "price": 960.0
+                },
+                {
+                    "handle": "be23053-blk",
+                    "title": "Black Jeans",
+                    "color": "BLACK",
+                    "price": 1050.0
+                },
+                {
+                    "handle": "be24051-blu",
+                    "title": "Boy Skinny Jeans",
+                    "color": "BLUE",
+                    "price": 1125.0
+                },
+                {
+                    "handle": "be24051-gry",
+                    "title": "Boy Skinny Jeans",
+                    "color": "GREY",
+                    "price": 1125.0
+                },
+                {
+                    "handle": "be24052-blu",
+                    "title": "Boy Denim Jeans",
+                    "color": "BLUE",
+                    "price": 1155.0
+                }
+            ],
+            "notes": "Jeans capped at 1200 — affordable denim range. Many products qualify. Multiple valid handles accepted."
+        },
+        {
+            "id": "Q15",
+            "category": "price_filter",
+            "query": "navy t-shirt under 900",
+            "color_filter": "NAVY",
+            "max_price": 900,
+            "expected_products": [
+                {
+                    "handle": "be25105-nvy",
+                    "title": "BOY T SHIRT",
+                    "color": "NAVY",
+                    "price": 839.0
+                },
+                {
+                    "handle": "be25106-nvy",
+                    "title": "BOY T SHIRT",
+                    "color": "NAVY",
+                    "price": 839.0
+                },
+                {
+                    "handle": "be25101-nvy",
+                    "title": "All-Over Print T-shirt",
+                    "color": "NAVY",
+                    "price": 909.0
+                }
+            ],
+            "notes": "NAVY + price cap 900. Tests borderline price — 909 should fail strict filter but pass cascade."
+        },
+        {
+            "id": "Q16",
+            "category": "natural_language",
+            "query": "something cool for my son to wear at school",
+            "color_filter": null,
+            "max_price": null,
+            "expected_products": [
+                {
+                    "handle": "be25110-blk",
+                    "title": "Transformers Printed T-shirt",
+                    "color": "BLACK",
+                    "price": 979.0
+                },
+                {
+                    "handle": "be25140-rbl",
+                    "title": "Marvel Graphic T-shirt",
+                    "color": "ROYAL BLUE",
+                    "price": 1049.0
+                },
+                {
+                    "handle": "be25104-org",
+                    "title": "DRAGON BALL Z T-SHIRT",
+                    "color": "ORANGE",
+                    "price": 839.0
+                }
+            ],
+            "notes": "Vague intent. Graphic/character t-shirts are most relevant for school-age boys. Tests semantic understanding."
+        },
+        {
+            "id": "Q17",
+            "category": "natural_language",
+            "query": "Mujhe blue shirt chahiye 1000 se kam mein",
+            "color_filter": "BLUE",
+            "max_price": 1000,
+            "expected_products": [],
+            "notes": "Romanized Urdu (I want a blue shirt under 1000). No blue shirt exists under 1000 PKR in the catalog — correct behavior is 0 results. Tests that strict filter does NOT cascade to wrong-color/over-budget products."
+        },
+        {
+            "id": "Q18",
+            "category": "natural_language",
+            "query": "navy wali shirt dikhao",
+            "color_filter": "NAVY",
+            "max_price": null,
+            "expected_products": [
+                {
+                    "handle": "be25105-nvy",
+                    "title": "BOY T SHIRT",
+                    "color": "NAVY",
+                    "price": 839.0
+                },
+                {
+                    "handle": "be25111-nvy",
+                    "title": "BOY T SHIRT",
+                    "color": "NAVY",
+                    "price": 979.0
+                },
+                {
+                    "handle": "be25126-nvy",
+                    "title": "BOY T SHIRT",
+                    "color": "NAVY",
+                    "price": 1049.0
+                }
+            ],
+            "notes": "Short Urdu (show me navy shirts). Should resolve to navy products."
+        },
+        {
+            "id": "Q19",
+            "category": "natural_language",
+            "query": "comfy everyday outfit for a 10 year old boy",
+            "color_filter": null,
+            "max_price": null,
+            "expected_products": [
+                {
+                    "handle": "be25112-blk",
+                    "title": "BOY T SHIRT",
+                    "color": "BLACK",
+                    "price": 979.0
+                },
+                {
+                    "handle": "be25115-wht",
+                    "title": "BOY T SHIRT",
+                    "color": "WHITE",
+                    "price": 1049.0
+                },
+                {
+                    "handle": "be25123-wht",
+                    "title": "California Surfing T-shirt",
+                    "color": "WHITE",
+                    "price": 1049.0
+                }
+            ],
+            "notes": "Age-specific phrasing. All products fit 04Y-14Y kids. Tests everyday casual retrieval."
+        },
+        {
+            "id": "Q20",
+            "category": "natural_language",
+            "query": "show me something for a boy in dark colours",
+            "color_filter": "BLACK",
+            "max_price": null,
+            "expected_products": [
+                {
+                    "handle": "be25112-blk",
+                    "title": "BOY T SHIRT",
+                    "color": "BLACK",
+                    "price": 979.0
+                },
+                {
+                    "handle": "be25114-blk",
+                    "title": "BOY OVERSIZED T SHIRT",
+                    "color": "BLACK",
+                    "price": 1049.0
+                },
+                {
+                    "handle": "be25129-blk",
+                    "title": "Graphic T- shirt",
+                    "color": "BLACK",
+                    "price": 1049.0
+                },
+                {
+                    "handle": "be25052-blk",
+                    "title": "BOY JEANS",
+                    "color": "BLACK",
+                    "price": 2659.0
+                },
+                {
+                    "handle": "be25116-blk",
+                    "title": "BOY T SHIRT",
+                    "color": "BLACK",
+                    "price": 979.0
+                },
+                {
+                    "handle": "be24053-blk",
+                    "title": "Boy Denim Jeans",
+                    "color": "BLACK",
+                    "price": 1185.0
+                }
+            ],
+            "notes": "Ambiguous plural 'dark colours'. AI should anchor to BLACK as safest dark color. Multiple valid BLACK products accepted."
+        },
+        {
+            "id": "Q21",
+            "category": "catalog_coverage",
+            "query": "boys cargo pants",
+            "color_filter": null,
+            "max_price": null,
+            "expected_products": [
+                {
+                    "handle": "be24601-blk",
+                    "title": "Boy Cargo Pant",
+                    "color": "BLACK",
+                    "price": 960.0
+                },
+                {
+                    "handle": "be24601-khk",
+                    "title": "Boy Cargo Pant",
+                    "color": "KHAKI",
+                    "price": 960.0
+                },
+                {
+                    "handle": "be24603-blk",
+                    "title": "Boy Cargo Pant",
+                    "color": "BLACK",
+                    "price": 1050.0
+                }
+            ],
+            "notes": "Cargo pants — 4+ cargo products available. Low frequency type test."
+        },
+        {
+            "id": "Q22",
+            "category": "catalog_coverage",
+            "query": "shorts for boys",
+            "color_filter": null,
+            "max_price": null,
+            "expected_products": [
+                {
+                    "handle": "be23906-blk",
+                    "title": "Black Short",
+                    "color": "BLACK",
+                    "price": 900.0
+                },
+                {
+                    "handle": "be23903-blk",
+                    "title": "Black Short",
+                    "color": "BLACK",
+                    "price": 960.0
+                },
+                {
+                    "handle": "be24906-ylw",
+                    "title": "Boy Graphic Short",
+                    "color": "YELLOW",
+                    "price": 645.0
+                }
+            ],
+            "notes": "Shorts — only 3 products total. Should return all 3."
+        },
+        {
+            "id": "Q23",
+            "category": "catalog_coverage",
+            "query": "matching co-ord set for boys",
+            "color_filter": null,
+            "max_price": null,
+            "expected_products": [
+                {
+                    "handle": "be25107-aqu",
+                    "title": "BOY COORD SET T SHIRT",
+                    "color": "AQUA",
+                    "price": 979.0
+                },
+                {
+                    "handle": "be25108-red",
+                    "title": "BOY COORD SET T SHIRT",
+                    "color": "RED",
+                    "price": 979.0
+                },
+                {
+                    "handle": "be25141-mst",
+                    "title": "BOY COORD SET T SHIRT",
+                    "color": "MUSTARD",
+                    "price": 979.0
+                }
+            ],
+            "notes": "Co-ord sets — 4 products (including one CORDSET T SHIRT). Tests rare category recall."
+        },
+        {
+            "id": "Q24",
+            "category": "catalog_coverage",
+            "query": "navy pants for boys",
+            "color_filter": "NAVY",
+            "max_price": null,
+            "expected_products": [
+                {
+                    "handle": "be23602-nvy",
+                    "title": "Navy C Pant",
+                    "color": "NAVY",
+                    "price": 960.0
+                },
+                {
+                    "handle": "be24604-nvy",
+                    "title": "Boy Cargo Pant",
+                    "color": "NAVY",
+                    "price": 1050.0
+                }
+            ],
+            "notes": "NAVY + pants — only 2 navy pant products. Min expected count: 2."
+        },
+        {
+            "id": "Q25",
+            "category": "catalog_coverage",
+            "query": "skin coloured casual shirt for boys",
+            "color_filter": "SKIN",
+            "max_price": null,
+            "expected_products": [
+                {
+                    "handle": "be23005-skn",
+                    "title": "Skin Casual Shirt",
+                    "color": "SKIN",
+                    "price": 870.0
+                }
+            ],
+            "notes": "Rarest color — only 1 SKIN product exists. Expected count: 1. Tests rare product retrieval."
+        },
+        {
+            "id": "Q26",
+            "category": "edge_case",
+            "query": "Dragon Ball Z t-shirt for boys",
+            "color_filter": null,
+            "max_price": null,
+            "expected_products": [
+                {
+                    "handle": "be25104-org",
+                    "title": "DRAGON BALL Z T-SHIRT",
+                    "color": "ORANGE",
+                    "price": 839.0
+                }
+            ],
+            "notes": "Exact product name search. Should rank DRAGON BALL Z T-SHIRT first with very high score."
+        },
+        {
+            "id": "Q27",
+            "category": "edge_case",
+            "query": "Transformers shirt for kids",
+            "color_filter": null,
+            "max_price": null,
+            "expected_products": [
+                {
+                    "handle": "be25110-blk",
+                    "title": "Transformers Printed T-shirt",
+                    "color": "BLACK",
+                    "price": 979.0
+                }
+            ],
+            "notes": "Brand/character name search. Transformers T-shirt is the only match."
+        },
+        {
+            "id": "Q28",
+            "category": "edge_case",
+            "query": "neon yellow jacket under 50 PKR",
+            "color_filter": "YELLOW",
+            "max_price": 50,
+            "expected_products": [],
+            "notes": "Cascade exhaustion. Price cap 50 PKR is below the cheapest product (450 PKR). Should return 0 results from all stages."
+        },
+        {
+            "id": "Q29",
+            "category": "edge_case",
+            "query": "laptop gaming accessories",
+            "color_filter": null,
+            "max_price": null,
+            "expected_products": [],
+            "notes": "Completely out-of-catalog. No laptops or accessories. AI should state the store only sells boy clothing."
+        },
+        {
+            "id": "Q30",
+            "category": "edge_case",
+            "query": "oversized t-shirt boys",
+            "color_filter": null,
+            "max_price": null,
+            "expected_products": [
+                {
+                    "handle": "be25114-blk",
+                    "title": "BOY OVERSIZED T SHIRT",
+                    "color": "BLACK",
+                    "price": 1049.0
+                }
+            ],
+            "notes": "Only 1 explicitly 'oversized' product. Tests specific attribute extraction from product titles."
+        }
+    ]
+}
