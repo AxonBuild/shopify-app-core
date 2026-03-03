@@ -1,3 +1,4 @@
+import asyncio
 import hashlib
 import hmac
 import json
@@ -355,13 +356,20 @@ async def receive_message(
         processed_content is not None, media is not None, len(chat_history)
     )
 
-    # ── AI processing ──────────
+    # ── AI processing ─────────────────────────────────────────────────────────
+    # Consistent ordering:
+    #   1. on_search_start  → asyncio.create_task()      fires immediately (before response)
+    #   2. return reply     → {"content": reply}          inline text reply to WA platform
+    #   3. on_products_found → background_tasks.add_task  fires after response is sent
     try:
         async def _on_search_start(msg: str):
+            # Fire immediately so the customer sees "Searching..." right away
             if wa_api_key and from_number:
-                background_tasks.add_task(send_text_message, wa_api_key, from_number, msg)
+                asyncio.create_task(send_text_message(wa_api_key, from_number, msg))
 
         async def _on_products_found(products: list):
+            # Schedule after the inline reply is returned so product cards
+            # always arrive after the text response, never before it
             if products and wa_api_key and from_number:
                 background_tasks.add_task(send_product_messages, wa_api_key, from_number, products)
 
@@ -371,14 +379,14 @@ async def receive_message(
             phone_number=from_number,
             chat_history=chat_history,
             on_search_start=_on_search_start,
-            on_products_found=_on_products_found
+            on_products_found=_on_products_found,
         )
 
     except Exception as e:
         logger.error(f"Error calling AI service: {e}")
         reply = "I'm sorry, I'm experiencing technical difficulties right now. Please try again later."
 
-    # Returning {"content": reply} replies to the incoming message instantly with the text
+    # Return the AI reply inline — WA platform displays this as the chat response
     return {"content": reply}
 
 
