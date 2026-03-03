@@ -40,52 +40,98 @@ async def send_product_messages(api_key: str, phone_number: str, products: list)
     Resolves the image to a base64 string and formats the text per product.
     """
     if not products or not api_key:
+        logger.warning("send_product_messages — skipped: no products or api_key missing")
         return
-        
+
+    to_send = products[:3]
+    logger.info("━" * 60)
+    logger.info(f"📤 PRODUCT DISPATCH — sending {len(to_send)} product(s) to {phone_number}")
+    logger.info("━" * 60)
+
+    sent_ok = 0
+    send_url = f"{settings.wa_platform_url.rstrip('/')}/api/send-message"
+
     async with httpx.AsyncClient(timeout=30.0) as client:
-        # Take at most 3 products
-        for p in products[:3]:
+        for idx, p in enumerate(to_send, 1):
+            title     = p.get("title", "Product")
+            handle    = p.get("handle", "")
+            price     = p.get("price", "N/A")
             image_url = p.get("image_url")
+
+            logger.info(f"  [{idx}/{len(to_send)}] Processing: {title!r} | handle={handle!r} | price={price}")
+
+            # ── 1. Guard: image_url required ────────────────────────────────
             if not image_url:
+                logger.warning(f"  [{idx}/{len(to_send)}] ⚠️  Skipped — no image_url for product: {title!r}")
                 continue
-                
-            # 1. Download image and convert to Base64
+
+            # ── 2. Download image and convert to Base64 ──────────────────────
             try:
                 img_res = await client.get(image_url)
                 img_res.raise_for_status()
-                b64_data = base64.b64encode(img_res.content).decode("utf-8")
+                b64_data  = base64.b64encode(img_res.content).decode("utf-8")
+                # Detect MIME type from response headers (e.g. "image/jpeg", "image/png")
+                mime_type = img_res.headers.get("content-type", "image/jpeg").split(";")[0].strip()
+                ext       = mime_type.split("/")[-1]   # "jpeg", "png", "webp", etc.
+                filename  = f"{handle}.{ext}" if handle else f"product.{ext}"
+                logger.info(
+                    f"  [{idx}/{len(to_send)}] 🖼️  Image downloaded — "
+                    f"status={img_res.status_code} mime={mime_type} size={len(img_res.content):,} bytes"
+                )
             except Exception as e:
-                logger.error(f"Failed to download image {image_url}: {e}")
+                logger.error(
+                    f"  [{idx}/{len(to_send)}] ❌ Image download FAILED for {title!r} "
+                    f"| url={image_url} | error={e}"
+                )
                 continue
-                
-            # 2. Format custom caption
-            title = p.get("title", "Product")
-            price = p.get("price", "N/A")
-            handle = p.get("handle", "")
-            url = f"https://ismailsclothing.com/products/{handle}"
-            
-            content = f"*{title}*\n\n*PKR {price}*\n\n{url}"
-            
-            # 3. Fire-and-forget WA platform dispatch
+
+            # ── 3. Build payload ─────────────────────────────────────────────
+            # Per API spec: `caption` inside the media object is what renders
+            # as text beneath the image in WhatsApp. Putting text in top-level
+            # `content` alongside a `media` object causes the image to be sent
+            # as a raw file/document instead of an inline picture.
+            url     = f"https://ismailsclothing.com/products/{handle}"
+            caption = f"*{title}*\n\n*PKR {price}*\n\n{url}"
+
             payload = {
                 "phoneNumber": phone_number,
-                "content": content,
+                "content": caption,     # required non-empty field by the API
                 "media": {
-                    "type": "IMAGE",
-                    "data": b64_data
+                    "type":     mime_type,  # e.g. "image/jpeg", "image/png"
+                    "data":     b64_data,
+                    "filename": filename,   # e.g. "bu25116-beg.jpeg"
+                    "caption":  caption,   # renders as text beneath the image in WhatsApp
                 }
             }
-            
+            headers = {
+                "x-api-key": api_key,
+                "Content-Type": "application/json",
+            }
+
+            # ── 4. POST to WA Platform ──────────────────────────────────────
             try:
-                headers = {
-                    "x-api-key": api_key,
-                    "Content-Type": "application/json"
-                }
-                send_url = f"{settings.wa_platform_url.rstrip('/')}/api/send-message"
                 res = await client.post(send_url, json=payload, headers=headers)
                 res.raise_for_status()
+                sent_ok += 1
+                logger.info(
+                    f"  [{idx}/{len(to_send)}] ✅ Sent OK — "
+                    f"status={res.status_code} | product={title!r}"
+                )
+            except httpx.HTTPStatusError as e:
+                logger.error(
+                    f"  [{idx}/{len(to_send)}] ❌ WA Platform rejected product {title!r} — "
+                    f"status={e.response.status_code} | body={e.response.text[:200]}"
+                )
             except Exception as e:
-                logger.error(f"Failed to send product message via WhatsApp Platform: {e}")
+                logger.error(
+                    f"  [{idx}/{len(to_send)}] ❌ Failed to send product {title!r} — error={e}"
+                )
+
+    logger.info("━" * 60)
+    logger.info(
+        f"📤 DISPATCH COMPLETE — {sent_ok}/{len(to_send)} product(s) sent successfully to {phone_number}"
+    )
+    logger.info("━" * 60)
 
 
 async def send_text_message(api_key: str, phone_number: str, text: str):

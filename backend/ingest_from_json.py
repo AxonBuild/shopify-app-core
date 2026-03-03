@@ -34,6 +34,7 @@ sys.path.insert(0, str(BACKEND_DIR))
 
 from app.config.settings import settings
 from app.services.embedding_service import embedding_service
+from app.services.image_caption_service import image_caption_service
 
 import meilisearch
 
@@ -52,27 +53,65 @@ def build_text(product: Dict[str, Any]) -> str:
     Build the unified search string used for both:
       - OpenAI text embedding (semantic vector)
       - Meilisearch full-text search (the ONLY searchable field)
-    """
-    title = (product.get("Title") or "").strip()
 
-    # Process body_html or generate a caption using Vision
-    body_html = (product.get("body_html") or product.get("Body (HTML)") or "").strip()
-    
-    # Strip basic HTML tags
+    If body_html is missing/empty, falls back to OpenAI Vision captioning
+    the product image, passing structured metadata as grounding context.
+    """
+    title  = (product.get("Title")  or "").strip()
+    color  = (product.get("Color")  or "").strip()
+    p_type = (product.get("Type")   or "").strip()
+    size   = (product.get("Size")   or "").strip()
+
+    # ── 1. Try body_html first ────────────────────────────────────────────────
+    body_html  = (product.get("body_html") or product.get("Body (HTML)") or "").strip()
     clean_html = re.sub('<[^<]+>', ' ', body_html).strip()
-    
-    if clean_html and clean_html != "<!---->":
+    # Filter stale HTML comments like "<!---->"
+    clean_html = re.sub(r'<!--.*?-->', '', clean_html).strip()
+
+    if clean_html:
         return f"Title: {title}. Description: {clean_html}"
 
-    # Missing or empty body HTML, generate caption
+    # ── 2. No description — fall back to Vision captioning ────────────────────
     image_url = (product.get("Image_Src") or "").strip()
+    # Image_Src can be comma-separated; take only the first URL
+    if "," in image_url:
+        image_url = image_url.split(",")[0].strip()
+
     if image_url:
-        print(f"  [Captioner] Missing description for '{title}'. Generating from image...")
-        caption = image_caption_service.caption_image(image_url)
+        # Filter Tags: skip pure-sale/discount tags, keep meaningful ones
+        raw_tags = (product.get("Tags") or "").strip()
+        useful_tags = [
+            t.strip() for t in raw_tags.split(",")
+            if t.strip()
+            and not any(kw in t.lower() for kw in [
+                "sale", "discount", "flat", "off", "upload", "grade", "azadi",
+                "eidi", "all category", "ref!", "summer", "winter",
+            ])
+        ]
+        tags_str = ", ".join(useful_tags[:10])  # cap at 10 to avoid prompt bloat
+
+        product_context = (
+            f"- Title : {title}\n"
+            f"- Type  : {p_type}\n"
+            f"- Color : {color}\n"
+            f"- Sizes : {size}\n"
+            + (f"- Tags  : {tags_str}\n" if tags_str else "")
+        )
+
+        print(f"  [Captioner] No description for '{title}' — generating from image + metadata...")
+        caption = image_caption_service.caption_image(image_url, product_context=product_context)
         if caption:
             return f"Title: {title}. Description: {caption}"
-            
-    return f"Title: {title}."
+
+    # ── 3. No image either — build a minimal text from metadata ───────────────
+    parts = [f"Title: {title}."]
+    if p_type:
+        parts.append(f"Type: {p_type}.")
+    if color:
+        parts.append(f"Color: {color}.")
+    if size:
+        parts.append(f"Available sizes: {size}.")
+    return " ".join(parts)
 
 
 def safe_float(val) -> Optional[float]:
@@ -154,13 +193,29 @@ def ingest(json_path: Path, limit: Optional[int]):
 
     # Load products
     with open(json_path, "r", encoding="utf-8") as f:
-        products: List[Dict[str, Any]] = json.load(f)
+        all_products: List[Dict[str, Any]] = json.load(f)
+
+    # ── Filter: keep only products that have a usable description ────────────
+    # Products without body_html are skipped for now (no Vision captioning).
+    def has_description(p: Dict[str, Any]) -> bool:
+        raw = (p.get("body_html") or p.get("Body (HTML)") or "").strip()
+        # Strip HTML tags and HTML comments
+        clean = re.sub(r'<!--.*?-->', '', re.sub('<[^<]+>', ' ', raw)).strip()
+        return bool(clean)
+
+    valid_products   = [p for p in all_products if has_description(p)]
+    skipped_no_desc  = len(all_products) - len(valid_products)
 
     if limit:
-        products = products[:limit]
+        products = valid_products[:limit]
+    else:
+        products = valid_products
 
-    total = len(products)
-    print(f"Loaded {total} products from JSON.\n")
+    total   = len(products)
+    print(f"Loaded {len(all_products)} products from JSON.")
+    if skipped_no_desc:
+        print(f"  ⏭️  Skipped {skipped_no_desc} products with no body description.")
+    print(f"  ✅  Indexing {total} products with valid descriptions.\n")
 
     # Connect to Meilisearch
     client = meilisearch.Client(settings.meilisearch_url, settings.meilisearch_master_key)

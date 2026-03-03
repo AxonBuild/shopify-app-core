@@ -9,13 +9,23 @@ class ImageCaptionService:
     def __init__(self):
         self.client = OpenAI(api_key=settings.openai_api_key)
 
-    def caption_image(self, image_url: str) -> str:
+    def caption_image(self, image_url: str, product_context: str = "") -> str:
         """
         Use OpenAI Vision to generate a rich, structured description of the image.
-        Uses the shared caption prompt for consistency.
+        Optionally accepts product_context (title, type, color, size) to ground
+        the model when body_html is missing.
         """
         if not image_url:
             return ""
+
+        # Build the user text: system prompt + optional structured context
+        user_text = IMAGE_CAPTION_PROMPT
+        if product_context:
+            user_text = (
+                f"{IMAGE_CAPTION_PROMPT}\n\n"
+                f"Additional product metadata for context (use to improve accuracy, "
+                f"do NOT copy verbatim into the description):\n{product_context}"
+            )
 
         try:
             logger.info(f"Generating caption for image: {image_url}")
@@ -25,7 +35,7 @@ class ImageCaptionService:
                     {
                         "role": "user",
                         "content": [
-                            {"type": "text", "text": IMAGE_CAPTION_PROMPT},
+                            {"type": "text", "text": user_text},
                             {"type": "image_url", "image_url": {"url": image_url}},
                         ]
                     },
