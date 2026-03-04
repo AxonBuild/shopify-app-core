@@ -12,6 +12,7 @@ from app.config.settings import settings
 from app.database.engine import get_db
 from app.database.repositories.shop_installation_repository import ShopInstallationRepository
 from app.utils.logger import get_logger
+from app.utils.retry import retry_async
 from app.services.ai_service import ai_service
 
 router = APIRouter(prefix="/api/whatsapp", tags=["whatsapp"])
@@ -66,9 +67,15 @@ async def send_product_messages(api_key: str, phone_number: str, products: list)
                 logger.warning(f"  [{idx}/{len(to_send)}] ⚠️  Skipped — no image_url for product: {title!r}")
                 continue
 
-            # ── 2. Download image and convert to Base64 ──────────────────────
+            # ── 2. Download image → retry up to 2x on transient network errors ──
             try:
-                img_res = await client.get(image_url)
+                img_res = await retry_async(
+                    lambda: client.get(image_url),
+                    retries=2,
+                    delay=1.0,
+                    exceptions=(httpx.RequestError, httpx.TimeoutException),
+                    label=f"image-download [{title!r}]",
+                )
                 img_res.raise_for_status()
                 b64_data  = base64.b64encode(img_res.content).decode("utf-8")
                 # Detect MIME type from response headers (e.g. "image/jpeg", "image/png")
@@ -109,9 +116,17 @@ async def send_product_messages(api_key: str, phone_number: str, products: list)
                 "Content-Type": "application/json",
             }
 
-            # ── 4. POST to WA Platform ──────────────────────────────────────
+            # ── 4. POST to WA Platform → retry up to 3x on transient errors ──
+            # Only retry on network/timeout errors. 4xx responses (bad request,
+            # auth) are not retried since they won't change on a retry.
             try:
-                res = await client.post(send_url, json=payload, headers=headers)
+                res = await retry_async(
+                    lambda: client.post(send_url, json=payload, headers=headers),
+                    retries=3,
+                    delay=1.0,
+                    exceptions=(httpx.RequestError, httpx.TimeoutException),
+                    label=f"WA send-product [{title!r}]",
+                )
                 res.raise_for_status()
                 sent_ok += 1
                 logger.info(
@@ -137,27 +152,28 @@ async def send_product_messages(api_key: str, phone_number: str, products: list)
 
 async def send_text_message(api_key: str, phone_number: str, text: str):
     """
-    Background task to dispatch a quick text message via the WA Platform.
-    Useful for 'Searching...' or interim status updates.
+    Dispatch a quick text message via the WA Platform.
+    Retries up to 3 times on transient network errors.
     """
     if not text or not api_key:
         return
-        
+
+    send_url = f"{settings.wa_platform_url.rstrip('/')}/api/send-message"
+    payload  = {"phoneNumber": phone_number, "content": text}
+    headers  = {"x-api-key": api_key, "Content-Type": "application/json"}
+
     async with httpx.AsyncClient(timeout=10.0) as client:
-        payload = {
-            "phoneNumber": phone_number,
-            "content": text
-        }
-        headers = {
-            "x-api-key": api_key,
-            "Content-Type": "application/json"
-        }
-        send_url = f"{settings.wa_platform_url.rstrip('/')}/api/send-message"
         try:
-            res = await client.post(send_url, json=payload, headers=headers)
+            res = await retry_async(
+                lambda: client.post(send_url, json=payload, headers=headers),
+                retries=3,
+                delay=1.0,
+                exceptions=(httpx.RequestError, httpx.TimeoutException),
+                label="WA send-text",
+            )
             res.raise_for_status()
         except Exception as e:
-            logger.error(f"Failed to send interim text message via WA Platform: {e}")
+            logger.error(f"send_text_message — all retries exhausted: {e}")
 
 
 # ─────────────────────────────────────────────────────────────
@@ -324,7 +340,8 @@ async def receive_message(
     metadata    = payload.get("metadata", {})
     shop_id     = metadata.get("shopId")
     domain      = metadata.get("domain")
-    wa_api_key  = metadata.get("apiKey")  # Now provided securely in the payload!
+    # NOTE: apiKey is intentionally NOT read from the payload.
+    # It is retrieved from the database (stored securely during provisioning).
 
     message           = payload.get("message", {})
     message_id        = message.get("id")        # Use for deduplication later
@@ -333,6 +350,11 @@ async def receive_message(
     content           = message.get("content", "")
     processed_content = message.get("processedContent")  # WA-generated image caption
     media             = message.get("media")     # None for text-only messages
+
+    # ── Load API key from env (settings.wa_api_key) ───────────────
+    wa_api_key = settings.wa_api_key
+    if not wa_api_key:
+        logger.error("/messages — WA_API_KEY is not set in .env — cannot send replies")
 
     # Merge text content with image caption (processedContent) into a single enriched string.
     # This avoids sending the image to OpenAI's vision API — cheaper, faster, and sufficient

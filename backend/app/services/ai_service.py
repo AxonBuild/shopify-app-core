@@ -2,9 +2,11 @@ import asyncio
 import json
 from typing import List, Dict, Any, Optional
 
+import openai
 from openai import AsyncOpenAI
 from app.config.settings import settings
 from app.utils.logger import get_logger
+from app.utils.retry import retry_async
 from app.services.embedding_service import embedding_service
 from app.services.search_service import search_service
 from app.prompts.whatsapp_prompts import SYSTEM_PROMPT, SEARCH_TOOL_SCHEMA
@@ -94,14 +96,24 @@ class AIService:
         try:
             logger.info(f"Sending message to OpenAI for user {phone_number}")
             
-            # Initial call to OpenAI
-            response = await self.client.chat.completions.create(
-                model=settings.chat_model,
-                messages=messages,
-                tools=[SEARCH_TOOL_SCHEMA],
-                tool_choice="auto",
-                max_tokens=500
+            # Initial call to OpenAI — retry on transient connection/timeout errors.
+            # RateLimitError gets a longer initial delay (5s) since the quota
+            # needs time to replenish. Auth/invalid-request errors are permanent
+            # and are NOT retried.
+            response = await retry_async(
+                lambda: self.client.chat.completions.create(
+                    model=settings.chat_model,
+                    messages=messages,
+                    tools=[SEARCH_TOOL_SCHEMA],
+                    tool_choice="auto",
+                    max_tokens=500,
+                ),
+                retries=3,
+                delay=2.0,
+                exceptions=(openai.APIConnectionError, openai.APITimeoutError),
+                label="openai-first-call",
             )
+
 
             response_message = response.choices[0].message
             tool_calls = response_message.tool_calls
@@ -177,12 +189,18 @@ class AIService:
                             "content": format_products_for_ai(ai_context, search_context)
                         })
 
-                # Second call to OpenAI to generate the final response using the tool results
+                # Second call to OpenAI — retry the same way
                 logger.info("Sending tool results back to OpenAI")
-                final_response = await self.client.chat.completions.create(
-                    model=settings.chat_model,
-                    messages=messages,
-                    max_tokens=500
+                final_response = await retry_async(
+                    lambda: self.client.chat.completions.create(
+                        model=settings.chat_model,
+                        messages=messages,
+                        max_tokens=500,
+                    ),
+                    retries=3,
+                    delay=2.0,
+                    exceptions=(openai.APIConnectionError, openai.APITimeoutError),
+                    label="openai-second-call",
                 )
                 
                 return final_response.choices[0].message.content

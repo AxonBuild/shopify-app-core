@@ -37,6 +37,7 @@ class Settings(BaseSettings):
     # WhatsApp Platform Integration (platform-wide config)
     wa_platform_url: str = ""
     wa_platform_shared_secret: str = ""
+    wa_api_key: str = ""  # Global WA API key (loaded from .env)
     # NOTE: per-store agentId, apiKey, webhookUrl are stored in the DB per ShopInstallation
 
     model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8")
